@@ -9,7 +9,7 @@
 
 @layer base {
   body {
-    @apply bg-black text-zinc-100;
+    @apply bg-black text-zinc-100 antialiased;
   }
 }
 
@@ -19,15 +19,14 @@
       -45deg,
       transparent,
       transparent 4px,
-      rgba(255, 255, 255, 0.2) 4px,
-      rgba(255, 255, 255, 0.2) 8px
+      rgba(255, 255, 255, 0.1) 4px,
+      rgba(255, 255, 255, 0.1) 8px
     ), linear-gradient(to right, #0ea5e9, #ffffff, #38bdf8, #0ea5e9);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
     background-size: 200% auto;
     animation: shine 3s linear infinite;
-    display: inline-block;
   }
 
   @keyframes shine {
@@ -35,15 +34,13 @@
     100% { background-position: 200% center; }
   }
 
-  .prose table {
-    @apply border-collapse border border-white/20 rounded-lg overflow-hidden my-4 w-full;
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
   }
-
-  .prose th {
-    @apply bg-zinc-800/50 text-zinc-100 border border-white/20 px-4 py-2 text-left font-bold;
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
   }
-
-  .prose td {
-    @apply border border-white/20 px-4 py-2 text-zinc-300;
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-zinc-800 rounded-full;
   }
     }
