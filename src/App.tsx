@@ -20,10 +20,8 @@ import TicTacToeGame from './components/TicTacToeGame';
 import FlappyBirdGame from './components/FlappyBirdGame';
 import { soundService } from './services/soundService';
 
-// Set PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-// --- TYPES ---
 interface Message {
   role: 'user' | 'model';
   content: string;
@@ -38,7 +36,6 @@ interface ChatSession {
   createdAt: Date;
 }
 
-// CodeBlock Component
 const CodeBlock = ({ children, language }: any) => {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
@@ -63,25 +60,26 @@ const CodeBlock = ({ children, language }: any) => {
     </div>
   );
 };
-
 export default function App() {
   const [input, setInput] = useState('');
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [theme, setTheme] = useState<'blue' | 'red' | 'yellow'>('blue');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showGames, setShowGames] = useState(false);
   const [activeGame, setActiveGame] = useState<string | null>(null);
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const aiRef = useRef<any>(null);
   const chatRef = useRef<any>(null);
+  const mainRef = useRef<HTMLElement>(null);
 
-  const currentSession = sessions.find(s => s.id === currentSessionId);
-  // --- THEME HELPERS ---
+  const activeSession = sessions.find(s => s.id === activeSessionId);
+
   const getThemeColor = (type: 'bg' | 'text' | 'border') => {
     const colors = {
       blue: { bg: 'bg-sky-500', text: 'text-sky-500', border: 'border-sky-500' },
@@ -91,27 +89,25 @@ export default function App() {
     return colors[theme][type];
   };
 
-  // --- INITIALIZE AI (SAFE VERSION) ---
   useEffect(() => {
-    const initAI = () => {
-      // Pengecekan aman agar tidak blackscreen
-      const apiKey = typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY : undefined;
-      
-      if (apiKey) {
-        try {
-          const ai = new GoogleGenAI(apiKey);
-          aiRef.current = ai;
-          const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
-          chatRef.current = model.startChat({ history: [] });
-        } catch (e) {
-          console.error("AI Init Error:", e);
-        }
-      }
-    };
-    initAI();
+    const apiKey = typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY : undefined;
+    if (apiKey) {
+      try {
+        const ai = new GoogleGenAI(apiKey);
+        aiRef.current = ai;
+        const model = ai.getGenerativeModel({ 
+          model: "gemini-2.0-flash",
+          systemInstruction: "Your name is NFS DEV, created by Nell 56 Developer."
+        });
+        chatRef.current = model.startChat({ history: [] });
+      } catch (e) { console.error(e); }
+    }
   }, []);
 
-  const processFile = async (file: File) => {
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [sessions]);
+  const handleFileUpload = async (file: File) => {
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => setSelectedImage(e.target?.result as string);
@@ -125,28 +121,26 @@ export default function App() {
         const content = await page.getTextContent();
         text += content.items.map((item: any) => item.str).join(' ') + '\n';
       }
-      setInput(prev => prev + `\n[PDF: ${file.name}]\n${text}\n`);
+      setInput(prev => prev + `\n[PDF Content: ${file.name}]\n${text}\n`);
     }
+    setShowPlusMenu(false);
   };
+
   const sendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if ((!input.trim() && !selectedImage) || isLoading) return;
 
-    // Pengecekan API Key sebelum kirim
     const apiKey = typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY : undefined;
-    if (!apiKey) {
-      alert("API Key belum terpasang di Vercel!");
-      return;
-    }
+    if (!apiKey) { alert("API Key Missing!"); return; }
 
     soundService.play('SEND');
     const userMsg: Message = { role: 'user', content: input, timestamp: new Date(), image: selectedImage || undefined };
     
-    let sessionId = currentSessionId;
+    let sessionId = activeSessionId;
     if (!sessionId) {
       sessionId = Date.now().toString();
-      setSessions([{ id: sessionId, title: input.slice(0, 30) || 'New Chat', messages: [userMsg], createdAt: new Date() }, ...sessions]);
-      setCurrentSessionId(sessionId);
+      setSessions([{ id: sessionId, title: input.slice(0, 30) || 'New Mission', messages: [userMsg], createdAt: new Date() }, ...sessions]);
+      setActiveSessionId(sessionId);
     } else {
       setSessions(sessions.map(s => s.id === sessionId ? { ...s, messages: [...s.messages, userMsg] } : s));
     }
@@ -158,16 +152,11 @@ export default function App() {
     setIsLoading(true);
 
     try {
-      if (!aiRef.current) {
-        const ai = new GoogleGenAI(apiKey);
-        aiRef.current = ai;
-      }
+      if (!aiRef.current) aiRef.current = new GoogleGenAI(apiKey);
       const model = aiRef.current.getGenerativeModel({ model: "gemini-2.0-flash" });
       
       const parts: any[] = [{ text: currentInput }];
-      if (currentImg) {
-        parts.push({ inlineData: { data: currentImg.split(',')[1], mimeType: "image/jpeg" } });
-      }
+      if (currentImg) parts.push({ inlineData: { data: currentImg.split(',')[1], mimeType: "image/jpeg" } });
 
       const result = await model.generateContentStream(parts);
       let fullText = '';
@@ -182,15 +171,10 @@ export default function App() {
           messages: s.messages.map((m, idx) => idx === s.messages.length - 1 ? { ...m, content: fullText } : m)
         } : s));
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (err) { console.error(err); } finally { setIsLoading(false); }
   };
   return (
-    <div className="flex h-screen bg-black text-zinc-100 overflow-hidden">
-      {/* SIDEBAR */}
+    <div className="flex h-screen bg-black text-zinc-100 overflow-hidden font-sans">
       <AnimatePresence>
         {sidebarOpen && (
           <motion.aside initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className="w-72 border-r border-zinc-800 bg-zinc-950 flex flex-col z-50">
@@ -202,12 +186,12 @@ export default function App() {
               <button onClick={() => setSidebarOpen(false)} className="p-2 hover:bg-zinc-900 rounded-lg text-zinc-500"><X size={18}/></button>
             </div>
             <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
-              <button onClick={() => setCurrentSessionId(null)} className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-zinc-800 hover:border-zinc-600 transition-all mb-4">
+              <button onClick={() => setActiveSessionId(null)} className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-zinc-800 hover:border-zinc-600 transition-all mb-4">
                 <Plus size={18} className={getThemeColor('text')} />
                 <span className="text-sm font-bold text-zinc-400">NEW MISSION</span>
               </button>
               {sessions.map(s => (
-                <button key={s.id} onClick={() => setCurrentSessionId(s.id)} className={`w-full p-3 rounded-xl text-left text-sm mb-1 flex items-center gap-3 ${currentSessionId === s.id ? 'bg-zinc-900 border border-zinc-800' : 'hover:bg-zinc-900/50 text-zinc-500'}`}>
+                <button key={s.id} onClick={() => setActiveSessionId(s.id)} className={`w-full p-3 rounded-xl text-left text-sm mb-1 flex items-center gap-3 ${activeSessionId === s.id ? 'bg-zinc-900 border border-zinc-800' : 'hover:bg-zinc-900/50 text-zinc-500'}`}>
                   <MessageSquare size={14} /><span className="truncate flex-1">{s.title}</span>
                 </button>
               ))}
@@ -216,8 +200,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* MAIN */}
-      <main className="flex-1 flex flex-col relative bg-[radial-gradient(circle_at_center,rgba(24,24,27,0.5)_0%,transparent_100%)]">
+      <main ref={mainRef} className="flex-1 flex flex-col relative bg-[radial-gradient(circle_at_center,rgba(24,24,27,0.5)_0%,transparent_100%)]">
         <header className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-zinc-900 rounded-lg"><Menu size={20}/></button>}
@@ -235,8 +218,8 @@ export default function App() {
           </div>
         </header>
         <div className="flex-1 max-w-4xl mx-auto w-full p-6 overflow-y-auto custom-scrollbar">
-          {currentSession ? (
-            currentSession.messages.map((m, i) => (
+          {activeSession ? (
+            activeSession.messages.map((m, i) => (
               <div key={i} className={`flex gap-6 mb-8 ${m.role === 'user' ? 'justify-end' : ''}`}>
                 <div className={`flex-1 max-w-[85%] p-6 rounded-3xl border ${m.role === 'user' ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-950/50 border-zinc-800 shadow-2xl'}`}>
                   <div className="flex items-center gap-3 mb-4 opacity-50 text-[10px] font-bold uppercase tracking-widest">
@@ -254,20 +237,23 @@ export default function App() {
             ))
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-8 py-20">
-              <div className={`w-24 h-24 rounded-3xl ${getThemeColor('bg')} flex items-center justify-center shadow-2xl animate-pulse`}><Bot size={48} className="text-white" /></div>
+              <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }} className={`w-24 h-24 rounded-3xl ${getThemeColor('bg')} flex items-center justify-center shadow-2xl`}><Bot size={48} className="text-white" /></motion.div>
               <h2 className="text-5xl font-black tracking-tighter striped-blue-text">NFS DEV AI</h2>
-              <p className="text-zinc-500 max-w-md mx-auto">System ready. Awaiting mission parameters. Upload files or start a conversation.</p>
+              <p className="text-zinc-500 max-w-md mx-auto">Neural Interface v2.5. Initializing mission parameters. Upload files or start a conversation.</p>
+              <div className="grid grid-cols-2 gap-4 w-full max-w-lg">
+                {['Build a Website', 'Write Code', 'Analyze Data', 'Security Audit'].map(f => (
+                  <button key={f} onClick={() => setInput(f)} className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl hover:border-zinc-600 transition-all text-xs font-bold uppercase tracking-widest text-zinc-400">{f}</button>
+                ))}
+              </div>
             </div>
           )}
           <div ref={chatEndRef} />
         </div>
-
-        {/* INPUT */}
         <div className="p-6 bg-gradient-to-t from-black via-black to-transparent">
           <form onSubmit={sendMessage} className="max-w-4xl mx-auto relative group">
             <div className={`absolute -inset-1 rounded-[2rem] blur opacity-20 group-focus-within:opacity-40 transition-opacity ${getThemeColor('bg')}`} />
             <div className="relative bg-zinc-900 border border-zinc-800 rounded-[2rem] p-2 flex items-center gap-2 shadow-2xl">
-              <input type="file" ref={fileInputRef} onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} className="hidden" />
+              <input type="file" ref={fileInputRef} onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} className="hidden" />
               <button type="button" onClick={() => fileInputRef.current?.click()} className="p-4 hover:bg-zinc-800 rounded-full text-zinc-500"><ImageIcon size={20}/></button>
               <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Type mission command..." className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-4 px-2" />
               <button type="submit" disabled={isLoading} className={`p-4 ${getThemeColor('bg')} text-white rounded-full shadow-lg transition-all active:scale-90 disabled:opacity-50`}>
@@ -278,7 +264,6 @@ export default function App() {
         </div>
       </main>
 
-      {/* MODAL GAME */}
       {showGames && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl">
@@ -309,4 +294,4 @@ export default function App() {
       )}
     </div>
   );
-                    }
+                  }
