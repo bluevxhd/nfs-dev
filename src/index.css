@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-black text-zinc-100;
+  }
+}
+
+@layer utilities {
+  .striped-blue-text {
+    background: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 4px,
+      rgba(255, 255, 255, 0.2) 4px,
+      rgba(255, 255, 255, 0.2) 8px
+    ), linear-gradient(to right, #0ea5e9, #ffffff, #38bdf8, #0ea5e9);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    background-size: 200% auto;
+    animation: shine 3s linear infinite;
+    display: inline-block;
+  }
+
+  @keyframes shine {
+    0% { background-position: 0% center; }
+    100% { background-position: 200% center; }
+  }
+
+  .prose table {
+    @apply border-collapse border border-white/20 rounded-lg overflow-hidden my-4 w-full;
+  }
+
+  .prose th {
+    @apply bg-zinc-800/50 text-zinc-100 border border-white/20 px-4 py-2 text-left font-bold;
+  }
+
+  .prose td {
+    @apply border border-white/20 px-4 py-2 text-zinc-300;
+  }
+    }
