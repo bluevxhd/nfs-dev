@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap');
 @plugin "@tailwindcss/typography";
 
 @theme {
@@ -9,11 +9,12 @@
 
 @layer base {
   body {
-    @apply bg-black text-zinc-100 antialiased;
+    @apply bg-black text-zinc-100 antialiased selection:bg-sky-500/30;
   }
 }
 
 @layer utilities {
+  /* Animasi Tulisan Mengkilap (NFS DEV AI) */
   .striped-blue-text {
     background: repeating-linear-gradient(
       -45deg,
@@ -34,13 +35,14 @@
     100% { background-position: 200% center; }
   }
 
+  /* Scrollbar Custom */
   .custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
+    width: 5px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-zinc-800 rounded-full;
+    @apply bg-zinc-800 rounded-full border-2 border-black;
   }
-    }
+      }
